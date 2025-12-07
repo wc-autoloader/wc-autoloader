@@ -12,8 +12,17 @@
 
 ## Installation
 
-```bash
-npm install wc-autoloader
+You can load `wc-autoloader` directly from a CDN.
+
+```html
+<!-- Auto-register handler (Recommended) -->
+<script type="module" src="https://cdn.jsdelivr.net/gh/wc-autoloader/wc-autoloader/packages/core/dist/auto.min.js"></script>
+
+<!-- Or manual registration -->
+<script type="module">
+  import { registerHandler } from "https://cdn.jsdelivr.net/gh/wc-autoloader/wc-autoloader/packages/core/dist/index.esm.min.js";
+  registerHandler();
+</script>
 ```
 
 ## Usage

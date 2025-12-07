@@ -34,11 +34,9 @@ describe('registerHandler', () => {
     vi.clearAllMocks();
     
     // Mock customElements
-    vi.stubGlobal('customElements', {
-      define: vi.fn(),
-      get: vi.fn(),
-      whenDefined: vi.fn()
-    });
+    vi.spyOn(customElements, 'define');
+    vi.spyOn(customElements, 'get');
+    vi.spyOn(customElements, 'whenDefined');
   });
 
   it('should return early when no importmap exists', async () => {
@@ -148,11 +146,11 @@ describe('registerHandler', () => {
     vi.spyOn(autoloadModule, 'lazyLoad').mockResolvedValue();
 
     const observeSpy = vi.fn();
-    vi.stubGlobal('MutationObserver', vi.fn(() => ({
-      observe: observeSpy,
-      disconnect: vi.fn(),
-      takeRecords: vi.fn()
-    })));
+    vi.stubGlobal('MutationObserver', class {
+      observe = observeSpy;
+      disconnect = vi.fn();
+      takeRecords = vi.fn();
+    });
 
     const domCapture = captureDomContentLoaded();
     await registerHandler();
@@ -183,14 +181,14 @@ describe('registerHandler', () => {
     const lazyLoadSpy = vi.spyOn(autoloadModule, 'lazyLoad').mockResolvedValue();
 
     let capturedCallback: MutationCallback | null = null;
-    vi.stubGlobal('MutationObserver', vi.fn((callback) => {
-      capturedCallback = callback;
-      return {
-        observe: vi.fn(),
-        disconnect: vi.fn(),
-        takeRecords: vi.fn()
-      };
-    }));
+    vi.stubGlobal('MutationObserver', class {
+      observe = vi.fn();
+      disconnect = vi.fn();
+      takeRecords = vi.fn();
+      constructor(callback: MutationCallback) {
+        capturedCallback = callback;
+      }
+    });
 
     const domCapture = captureDomContentLoaded();
     await registerHandler();
@@ -248,14 +246,14 @@ describe('registerHandler', () => {
     const domCapture = captureDomContentLoaded();
 
     let capturedCallback: MutationCallback | null = null;
-    vi.stubGlobal('MutationObserver', vi.fn((callback) => {
-      capturedCallback = callback;
-      return {
-        observe: vi.fn(),
-        disconnect: vi.fn(),
-        takeRecords: vi.fn()
-      };
-    }));
+    vi.stubGlobal('MutationObserver', class {
+      observe = vi.fn();
+      disconnect = vi.fn();
+      takeRecords = vi.fn();
+      constructor(callback: MutationCallback) {
+        capturedCallback = callback;
+      }
+    });
 
     await registerHandler();
 

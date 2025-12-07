@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { load } from '../src/webc';
+import { load } from '../src/vanilla';
 
 describe('webc loader', () => {
   it('should have load function', () => {

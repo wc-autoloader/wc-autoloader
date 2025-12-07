@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { lazyLoad, eagerLoad } from '../src/autoload.js';
+import { lazyLoad, eagerLoad, resetState } from '../src/autoload.js';
 import { DEFAULT_KEY } from '../src/config.js';
 
 function createDeferred<T>() {
@@ -19,11 +19,11 @@ function createDeferred<T>() {
 describe('autoload', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
-    vi.stubGlobal('customElements', {
-      define: vi.fn(),
-      get: vi.fn(),
-      whenDefined: vi.fn()
-    });
+    resetState();
+    vi.clearAllMocks();
+    vi.spyOn(customElements, 'define');
+    vi.spyOn(customElements, 'get');
+    vi.spyOn(customElements, 'whenDefined');
   });
 
   describe('lazyLoad with ShadowRoot', () => {
@@ -392,7 +392,7 @@ describe('autoload', () => {
       shadow.innerHTML = '<ux-bad></ux-bad>';
 
       await expect(lazyLoad(shadow, prefixMap, loaders)).rejects.toThrow(
-        'Loader redirection is not supported for eager loaded components: UX-BAD'
+        'Loader redirection is not supported for lazy loaded components: ux-bad'
       );
     });
   });
@@ -610,5 +610,61 @@ describe('autoload', () => {
       expect(mockLoader).toHaveBeenCalledTimes(2);
       expect(customElements.define).toHaveBeenCalledTimes(2);
     });
+
+    it('should skip already failed components in eagerLoad', async () => {
+      const mockLoader = vi.fn().mockRejectedValue(new Error('Load failed'));
+      const loadMap = {
+        'my-button': {
+          key: './components/button.js',
+          tagName: 'my-button',
+          loaderKey: null,
+          extends: null,
+          isNameSpaced: false
+        }
+      };
+      const loaders = {
+        [DEFAULT_KEY]: {
+          postfix: '.js',
+          loader: mockLoader
+        }
+      };
+
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      // First attempt - fails
+      await eagerLoad(loadMap, loaders);
+      expect(consoleSpy).toHaveBeenCalledTimes(1);
+
+      // Second attempt - should skip logging/adding to failedTags
+      await eagerLoad(loadMap, loaders);
+      expect(consoleSpy).toHaveBeenCalledTimes(1); // Still 1
+
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe('matchNameSpace coverage', () => {
+    it('should handle non-matching prefix in loop', async () => {
+      const prefixMap = {
+        'ui': {
+          key: '@components/ui/',
+          prefix: 'ui',
+          loaderKey: null,
+          isNameSpaced: true
+        }
+      };
+      const loaders = { [DEFAULT_KEY]: { postfix: '.js', loader: vi.fn() } };
+
+      const host = document.createElement('div');
+      const shadow = host.attachShadow({ mode: 'open' });
+      shadow.innerHTML = '<other-button></other-button>';
+
+      // This should throw because "other-button" does not match "ui-" prefix
+      // and loop continues, then returns null, then throws "No matching namespace found"
+      await expect(lazyLoad(shadow, prefixMap, loaders)).rejects.toThrow(
+        "No matching namespace found for lazy loaded component: other-button"
+      );
+    });
   });
 });
+
