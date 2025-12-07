@@ -73,16 +73,16 @@ async function load(path) {
 }
 
 const DEFAULT_KEY = "*";
-const WEBC_KEY = "webc";
-const WEBC_LOADER = {
-    postfix: ".webc.js",
+const VANILLA_KEY = "vanilla";
+const VANILLA_LOADER = {
+    postfix: ".js",
     loader: load
 };
 const DEFAULT_CONFIG = {
     scanImportmap: true,
     loaders: {
-        [WEBC_KEY]: WEBC_LOADER,
-        [DEFAULT_KEY]: WEBC_KEY
+        [VANILLA_KEY]: VANILLA_LOADER,
+        [DEFAULT_KEY]: VANILLA_KEY
     },
     observable: true
 };
@@ -253,5 +253,5 @@ async function registerHandler() {
     }
 }
 
-export { DEFAULT_KEY, WEBC_KEY, WEBC_LOADER, buildMap, config, eagerLoad, lazyLoad, load, loadImportmap, registerHandler };
+export { DEFAULT_KEY, VANILLA_KEY, VANILLA_LOADER, buildMap, config, eagerLoad, lazyLoad, load, loadImportmap, registerHandler };
 //# sourceMappingURL=index.esm.js.map

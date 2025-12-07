@@ -5,8 +5,8 @@ export { load } from "./webc.js";
 export {
 	config,
 	DEFAULT_KEY,
-	WEBC_KEY,
-	WEBC_LOADER
+	VANILLA_KEY,
+	VANILLA_LOADER
 } from "./config.js";
 export type {
 	IEagerLoadInfo,

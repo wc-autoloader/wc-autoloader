@@ -1,15 +1,15 @@
 import { load } from "./webc.js";
 export const DEFAULT_KEY = "*";
-export const WEBC_KEY = "webc";
-export const WEBC_LOADER = {
-    postfix: ".webc.js",
+export const VANILLA_KEY = "vanilla";
+export const VANILLA_LOADER = {
+    postfix: ".js",
     loader: load
 };
 const DEFAULT_CONFIG = {
     scanImportmap: true,
     loaders: {
-        [WEBC_KEY]: WEBC_LOADER,
-        [DEFAULT_KEY]: WEBC_KEY
+        [VANILLA_KEY]: VANILLA_LOADER,
+        [DEFAULT_KEY]: VANILLA_KEY
     },
     observable: true
 };
