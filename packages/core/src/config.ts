@@ -1,6 +1,6 @@
 
 import { IConfig } from "./types.js"
-import { load } from "./webc.js"
+import { load } from "./vanilla.js"
 
 export const DEFAULT_KEY = "*";
 

@@ -1,4 +1,4 @@
-import { load } from "./webc.js";
+import { load } from "./vanilla.js";
 export const DEFAULT_KEY = "*";
 export const VANILLA_KEY = "vanilla";
 export const VANILLA_LOADER = {
