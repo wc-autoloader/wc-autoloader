@@ -1,63 +1,138 @@
-# webc-autoloader
-web component auto loader with importmap
+# wc-autoloader
 
-# 仕様
+`wc-autoloader` is a lightweight, zero-configuration autoloader for Web Components. It leverages standard [Import Maps](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/script/type/importmap) to automatically load component definitions when they are used in the DOM.
 
-importmap key:
-"@components/app/": "/path/to/components/",
+## Features
 
-prefix map "app" => "@components/app/"
-postfix(default) "*" => ".js"
-loader(default) "*" => webc
+- **Zero Configuration**: Uses standard Import Maps to define component locations.
+- **Lazy Loading**: Components are loaded only when they appear in the DOM.
+- **Eager Loading**: Support for pre-loading specific components.
+- **Dynamic Loading**: Observes DOM changes (MutationObserver) to load components added dynamically.
+- **Loader Support**: Extensible loader system (Vanilla JS, Lit, etc.).
 
-<app-main></app-main>
+## Installation
 
-create path "@components/app/main.js"
-getComponentClass("@components/app/main.js") // loader
-customeElements.define("app-main", componentClass)
+```bash
+npm install wc-autoloader
+```
+
+## Usage
+
+### 1. Setup Import Map
+
+Define your component paths in an import map using the `@components/` prefix.
 
 ```html
 <script type="importmap">
   {
     "imports": {
-      "@lit/core": "/path/to/lit-core.js",
-      "@components/app/": "/path/to/components/",
-      "@components/app|lit/": "/path/to/components/lit/",
-      "@components/app-sub1": "/path/to/components/sumComponent1.js", // app-sub1
-      "@components/app/sub2|lit": "/path/to/components/sumComponent2.js", // app-sub2
-      "@components/app/sub3|lit,div": "/path/to/components/sumComponent3.js", // app-sub3
-      "@components/app/sub4|*,div": "/path/to/components/sumComponent4.js", // app-sub4
-      "@autoloader/core": "/path/to/autoloader"
+      "@components/ui/": "./components/ui/",
+      "@components/app/": "./components/app/"
     }
   }
 </script>
-<script type="module" src="/path/to/autoloader/boot.js"></script>
+```
 
+### 2. Register the Handler
+
+Import and call `registerHandler` in your main script.
+
+```html
 <script type="module">
-import { setAutoLoaderConfig, importDefaultClass } from "@autoloader";
-import { componentFromModule } from "@lit/core";
-
-setAutoLoaderConfig({
-  scanImportmap: true,
-  loaders: {
-    "webc": {
-      postfix: ".js",
-      loader: importDefaultClass
-    },
-    "lit": {
-      postfix: ".js",
-      loader: convertFromModule
-    },
-    "*": "webc"
-  },
-  observable: true,
-});
+  import { registerHandler } from "wc-autoloader";
+  registerHandler();
 </script>
 ```
 
-```js:autoloader.js
-export function importDefaultClass(path) {
-  const module = await import(path);
-  return module.default;
+### 3. Use Components
+
+Just use your custom elements in HTML. `wc-autoloader` will automatically import the matching file.
+
+```html
+<!-- Loads ./components/ui/button.webc.js -->
+<ui-button></ui-button>
+
+<!-- Loads ./components/app/header.webc.js -->
+<app-header></app-header>
+```
+
+## Import Map Syntax
+
+`wc-autoloader` parses keys in the import map starting with `@components/`.
+
+### Lazy Loading (Namespaces)
+
+To enable lazy loading for a group of components, use a key ending with `/`.
+
+Format: `"@components/<prefix>[|<loader>]/": "<path>"`
+
+- **Prefix**: The tag prefix. Slashes are converted to dashes.
+- **Loader** (Optional): The loader to use (e.g., `webc`, `lit`). Defaults to `webc`.
+
+**Examples:**
+
+```json
+{
+  "imports": {
+    // Maps <my-component> to ./components/component.webc.js
+    "@components/my/": "./components/",
+
+    // Maps <ui-button> to ./ui/button.js (using 'lit' loader if configured)
+    "@components/ui|lit/": "./ui/"
+  }
 }
 ```
+
+### Eager Loading
+
+To load a specific component immediately, use a key that does NOT end with `/`.
+
+Format: `"@components/<tagName>[|<loader>[,<extends>]]": "<path>"`
+
+**Examples:**
+
+```json
+{
+  "imports": {
+    // Eager loads <my-button> from ./my-button.js
+    "@components/my-button": "./my-button.js",
+
+    // Eager loads <fancy-input> extending 'input'
+    "@components/fancy-input|vanilla,input": "./fancy-input.js"
+  }
+}
+```
+
+## Component Requirements
+
+By default (using the `webc` loader), your component files should:
+
+1.  Have a `.webc.js` extension (configurable).
+2.  Export the custom element class as `default`.
+
+```javascript
+// components/ui/button.webc.js
+export default class UiButton extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: 'open' }).innerHTML = '<button><slot></slot></button>';
+  }
+}
+```
+
+## Configuration
+
+You can configure loaders by modifying the `config` object.
+
+```javascript
+import { registerHandler, config } from "wc-autoloader";
+
+// Example: Change default postfix
+config.loaders.webc.postfix = ".js";
+
+registerHandler();
+```
+
+## License
+
+MIT
