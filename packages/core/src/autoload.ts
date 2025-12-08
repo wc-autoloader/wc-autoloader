@@ -4,6 +4,74 @@ import { IEagerLoadInfo, ILoader, INameSpaceInfo, IPrefixMap, ITagInfo } from ".
 const failedTags = new Set<string>();
 const loadingTags = new Set<string>();
 
+const EXTENDS_MAP = new Map<any, string>();
+
+if (typeof window !== "undefined") {
+  const map = [
+    [HTMLButtonElement, "button"],
+    [HTMLInputElement, "input"],
+    [HTMLAnchorElement, "a"],
+    [HTMLImageElement, "img"],
+    [HTMLDivElement, "div"],
+    [HTMLSpanElement, "span"],
+    [HTMLParagraphElement, "p"],
+    [HTMLUListElement, "ul"],
+    [HTMLOListElement, "ol"],
+    [HTMLLIElement, "li"],
+    [HTMLTableElement, "table"],
+    [HTMLFormElement, "form"],
+    [HTMLLabelElement, "label"],
+    [HTMLSelectElement, "select"],
+    [HTMLTextAreaElement, "textarea"],
+    [HTMLHeadingElement, "h1"],
+    [HTMLQuoteElement, "blockquote"],
+    [HTMLPreElement, "pre"],
+    [HTMLBRElement, "br"],
+    [HTMLHRElement, "hr"],
+    [HTMLModElement, "ins"],
+    [HTMLTableCaptionElement, "caption"],
+    [HTMLTableColElement, "col"],
+    [HTMLTableSectionElement, "tbody"],
+    [HTMLTableRowElement, "tr"],
+    [HTMLTableCellElement, "td"],
+    [HTMLFieldSetElement, "fieldset"],
+    [HTMLLegendElement, "legend"],
+    [HTMLDListElement, "dl"],
+    [HTMLOptGroupElement, "optgroup"],
+    [HTMLOptionElement, "option"],
+    [HTMLStyleElement, "style"],
+    [HTMLScriptElement, "script"],
+    [HTMLTemplateElement, "template"],
+    [HTMLCanvasElement, "canvas"],
+    [HTMLIFrameElement, "iframe"],
+    [HTMLObjectElement, "object"],
+    [HTMLEmbedElement, "embed"],
+    [HTMLVideoElement, "video"],
+    [HTMLAudioElement, "audio"],
+    [HTMLTrackElement, "track"],
+    [HTMLMapElement, "map"],
+    [HTMLAreaElement, "area"],
+    [HTMLSourceElement, "source"],
+    [HTMLParamElement, "param"],
+    [HTMLMeterElement, "meter"],
+    [HTMLProgressElement, "progress"],
+    [HTMLOutputElement, "output"],
+    [HTMLDetailsElement, "details"],
+    [HTMLDialogElement, "dialog"],
+    [HTMLMenuElement, "menu"],
+    [HTMLSlotElement, "slot"],
+    [HTMLTimeElement, "time"],
+    [HTMLDataElement, "data"],
+    [HTMLPictureElement, "picture"],
+  ] as const;
+
+  map.forEach(([cls, tag]) => {
+    if (typeof cls !== "undefined") {
+      EXTENDS_MAP.set(cls, tag);
+    }
+  });
+}
+
 export function resetState() {
   failedTags.clear();
   loadingTags.clear();
@@ -60,6 +128,54 @@ function getUndefinedTagInfos(elements:Array<Element>): Array<ITagInfo> {
   return tagInfos;
 }
 
+function resolveLoader(
+  path: string,
+  loaderKey: string | null,
+  loaders: Record<string, ILoader | string>
+): ILoader {
+  let loader: ILoader | string;
+
+  if (loaderKey === null || loaderKey === DEFAULT_KEY || loaderKey === "") {
+    // Try to resolve by postfix
+    let resolvedLoader: ILoader | null = null;
+    for (const [key, l] of Object.entries(loaders)) {
+      if (key === DEFAULT_KEY) continue;
+      const currentLoader = typeof l === "string" ? loaders[l] : l;
+      if (typeof currentLoader === "string") continue; // Should not happen if config is correct
+      
+      if (path.endsWith(currentLoader.postfix)) {
+        resolvedLoader = currentLoader;
+        break;
+      }
+    }
+
+    if (resolvedLoader) {
+      loader = resolvedLoader;
+    } else {
+      loader = loaders[DEFAULT_KEY];
+      if (typeof loader === "string") {
+        loader = loaders[loader];
+      }
+    }
+  } else {
+    loader = loaders[loaderKey];
+  }
+
+  if (typeof loader === "string") {
+    throw new Error("Loader redirection is not supported here");
+  }
+  return loader;
+}
+
+function resolveExtends(componentConstructor: CustomElementConstructor): string | null {
+  for (const [cls, tag] of EXTENDS_MAP) {
+    if (componentConstructor.prototype instanceof cls) {
+      return tag;
+    }
+  }
+  return null;
+}
+
 export async function lazyLoad(
   root: Document | ShadowRoot, 
   prefixMap: IPrefixMap,
@@ -73,18 +189,14 @@ export async function lazyLoad(
       if (info === null) {
         throw new Error("No matching namespace found for lazy loaded component: " + tagInfo.name);
       }
-      let loader: ILoader | string;
-      if (info.loaderKey === null || info.loaderKey === DEFAULT_KEY || info.loaderKey === "") {
-        loader = loaders[DEFAULT_KEY];
-        if (typeof loader === "string") {
-          loader = loaders[loader];
-        }
-      } else {
-        loader = loaders[info.loaderKey];
-      }
-      if (typeof loader === "string") {
+      
+      let loader: ILoader;
+      try {
+        loader = resolveLoader("", info.loaderKey, loaders);
+      } catch (e) {
         throw new Error("Loader redirection is not supported for lazy loaded components: " + tagInfo.name);
       }
+
       loadingTags.add(tagInfo.name);
       let file: string = tagInfo.name.slice(info.prefix.length + 1);
       if (file === "") {
@@ -120,25 +232,25 @@ export async function eagerLoad(
   loaders: Record<string, ILoader | string>
 ): Promise<void> {
   for(const [tagName, info] of Object.entries(loadMap)) {
-    let loader: ILoader | string;
-    if (info.loaderKey === null || info.loaderKey === DEFAULT_KEY || info.loaderKey === "") {
-      loader = loaders[DEFAULT_KEY];
-      if (typeof loader === "string") {
-        loader = loaders[loader];
-      }
-    } else {
-      loader = loaders[info.loaderKey];
-    }
-    if (typeof loader === "string") {
+    let loader: ILoader;
+    try {
+      loader = resolveLoader(info.key, info.loaderKey, loaders);
+    } catch (e) {
       throw new Error("Loader redirection is not supported for eager loaded components: " + tagName);
     }
+
     try {
       const componentConstructor = await loader.loader(info.key);
       if (componentConstructor !== null) {
-        if (info.extends === null) {
+        let extendsName = info.extends;
+        if (extendsName === null) {
+          extendsName = resolveExtends(componentConstructor);
+        }
+
+        if (extendsName === null) {
           customElements.define(tagName, componentConstructor);
         } else {
-          customElements.define(tagName, componentConstructor, { extends: info.extends });
+          customElements.define(tagName, componentConstructor, { extends: extendsName });
         }
       }
     } catch(e) {

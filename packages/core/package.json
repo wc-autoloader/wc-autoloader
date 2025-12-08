@@ -5,8 +5,10 @@
   "type": "module",
   "main": "./dist/index.esm.js",
   "module": "./dist/index.esm.js",
+  "types": "./dist/exports.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/exports.d.ts",
       "import": "./dist/index.esm.js"
     }
   },
