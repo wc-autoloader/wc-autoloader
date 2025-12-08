@@ -58,10 +58,10 @@ Import and call `registerHandler` in your main script.
 Just use your custom elements in HTML. `wc-autoloader` will automatically import the matching file.
 
 ```html
-<!-- Loads ./components/ui/button.webc.js -->
+<!-- Loads ./components/ui/button.js -->
 <ui-button></ui-button>
 
-<!-- Loads ./components/app/header.webc.js -->
+<!-- Loads ./components/app/header.js -->
 <app-header></app-header>
 ```
 
@@ -76,14 +76,14 @@ To enable lazy loading for a group of components, use a key ending with `/`.
 Format: `"@components/<prefix>[|<loader>]/": "<path>"`
 
 - **Prefix**: The tag prefix. Slashes are converted to dashes.
-- **Loader** (Optional): The loader to use (e.g., `webc`, `lit`). Defaults to `webc`.
+- **Loader** (Optional): The loader to use (e.g., `vanilla`, `lit`). Defaults to `vanilla`.
 
 **Examples:**
 
 ```json
 {
   "imports": {
-    // Maps <my-component> to ./components/component.webc.js
+    // Maps <my-component> to ./components/component.js
     "@components/my/": "./components/",
 
     // Maps <ui-button> to ./ui/button.js (using 'lit' loader if configured)
@@ -114,13 +114,13 @@ Format: `"@components/<tagName>[|<loader>[,<extends>]]": "<path>"`
 
 ## Component Requirements
 
-By default (using the `webc` loader), your component files should:
+By default (using the `vanilla` loader), your component files should:
 
-1.  Have a `.webc.js` extension (configurable).
+1.  Have a `.js` extension (configurable).
 2.  Export the custom element class as `default`.
 
 ```javascript
-// components/ui/button.webc.js
+// components/ui/button.js
 export default class UiButton extends HTMLElement {
   constructor() {
     super();
@@ -137,7 +137,7 @@ You can configure loaders by modifying the `config` object.
 import { registerHandler, config } from "wc-autoloader";
 
 // Example: Change default postfix
-config.loaders.webc.postfix = ".js";
+config.loaders.vanilla.postfix = ".vanilla.js";
 
 registerHandler();
 ```
