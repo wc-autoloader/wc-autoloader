@@ -78,7 +78,7 @@ export function resetState() {
 }
 
 function getTagInfoFromElement(e: Element): ITagInfo {
-  let elementTagName = e.tagName.toLowerCase();
+  const elementTagName = e.tagName.toLowerCase();
   let name;
   let extendsName;
   if (elementTagName.includes("-")) {
@@ -193,7 +193,7 @@ export async function lazyLoad(
   let undefinedTagInfos = getUndefinedTagInfos(Array.from(elements));
   while(undefinedTagInfos.length > 0) {
     for(const tagInfo of undefinedTagInfos) {
-      let info: INameSpaceInfo | null = matchNameSpace(tagInfo.name, prefixMap);
+      const info: INameSpaceInfo | null = matchNameSpace(tagInfo.name, prefixMap);
       if (info === null) {
         throw new Error("No matching namespace found for lazy loaded component: " + tagInfo.name);
       }
@@ -201,12 +201,12 @@ export async function lazyLoad(
       let loader: ILoader;
       try {
         loader = resolveLoader("", info.loaderKey, loaders);
-      } catch (e) {
+      } catch (_e) {
         throw new Error("Loader redirection is not supported for lazy loaded components: " + tagInfo.name);
       }
 
       loadingTags.add(tagInfo.name);
-      let file: string = tagInfo.name.slice(info.prefix.length + 1);
+      const file: string = tagInfo.name.slice(info.prefix.length + 1);
       if (file === "") {
         throw new Error("Invalid component name for lazy loaded component: " + tagInfo.name);
       }
@@ -243,7 +243,7 @@ export async function eagerLoad(
     let loader: ILoader;
     try {
       loader = resolveLoader(info.key, info.loaderKey, loaders);
-    } catch (e) {
+    } catch (_e) {
       throw new Error("Loader redirection is not supported for eager loaded components: " + tagName);
     }
 
