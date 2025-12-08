@@ -52,7 +52,7 @@ function getKeyInfoFromImportmapKey(key) {
 function buildMap(importmap) {
     const prefixMap = {};
     const loadMap = {};
-    for (const [key, value] of Object.entries(importmap.imports)) {
+    for (const [key, _value] of Object.entries(importmap.imports)) {
         const keyInfo = getKeyInfoFromImportmapKey(key);
         if (keyInfo === null) {
             continue;
@@ -90,8 +90,73 @@ const config = DEFAULT_CONFIG;
 
 const failedTags = new Set();
 const loadingTags = new Set();
+const EXTENDS_MAP = new Map();
+if (typeof window !== "undefined") {
+    const map = [
+        [HTMLButtonElement, "button"],
+        [HTMLInputElement, "input"],
+        [HTMLAnchorElement, "a"],
+        [HTMLImageElement, "img"],
+        [HTMLDivElement, "div"],
+        [HTMLSpanElement, "span"],
+        [HTMLParagraphElement, "p"],
+        [HTMLUListElement, "ul"],
+        [HTMLOListElement, "ol"],
+        [HTMLLIElement, "li"],
+        [HTMLTableElement, "table"],
+        [HTMLFormElement, "form"],
+        [HTMLLabelElement, "label"],
+        [HTMLSelectElement, "select"],
+        [HTMLTextAreaElement, "textarea"],
+        [HTMLHeadingElement, "h1"],
+        [HTMLQuoteElement, "blockquote"],
+        [HTMLPreElement, "pre"],
+        [HTMLBRElement, "br"],
+        [HTMLHRElement, "hr"],
+        [HTMLModElement, "ins"],
+        [HTMLTableCaptionElement, "caption"],
+        [HTMLTableColElement, "col"],
+        [HTMLTableSectionElement, "tbody"],
+        [HTMLTableRowElement, "tr"],
+        [HTMLTableCellElement, "td"],
+        [HTMLFieldSetElement, "fieldset"],
+        [HTMLLegendElement, "legend"],
+        [HTMLDListElement, "dl"],
+        [HTMLOptGroupElement, "optgroup"],
+        [HTMLOptionElement, "option"],
+        [HTMLStyleElement, "style"],
+        [HTMLScriptElement, "script"],
+        [HTMLTemplateElement, "template"],
+        [HTMLCanvasElement, "canvas"],
+        [HTMLIFrameElement, "iframe"],
+        [HTMLObjectElement, "object"],
+        [HTMLEmbedElement, "embed"],
+        [HTMLVideoElement, "video"],
+        [HTMLAudioElement, "audio"],
+        [HTMLTrackElement, "track"],
+        [HTMLMapElement, "map"],
+        [HTMLAreaElement, "area"],
+        [HTMLSourceElement, "source"],
+        [HTMLParamElement, "param"],
+        [HTMLMeterElement, "meter"],
+        [HTMLProgressElement, "progress"],
+        [HTMLOutputElement, "output"],
+        [HTMLDetailsElement, "details"],
+        [HTMLDialogElement, "dialog"],
+        [HTMLMenuElement, "menu"],
+        [HTMLSlotElement, "slot"],
+        [HTMLTimeElement, "time"],
+        [HTMLDataElement, "data"],
+        [HTMLPictureElement, "picture"],
+    ];
+    map.forEach(([cls, tag]) => {
+        if (typeof cls !== "undefined") {
+            EXTENDS_MAP.set(cls, tag);
+        }
+    });
+}
 function getTagInfoFromElement(e) {
-    let elementTagName = e.tagName.toLowerCase();
+    const elementTagName = e.tagName.toLowerCase();
     let name;
     let extendsName;
     if (elementTagName.includes("-")) {
@@ -139,30 +204,72 @@ function getUndefinedTagInfos(elements) {
     }
     return tagInfos;
 }
+function resolveLoader(path, loaderKey, loaders) {
+    let loader;
+    if (loaderKey === null || loaderKey === DEFAULT_KEY || loaderKey === "") {
+        // Try to resolve by postfix
+        let resolvedLoader = null;
+        const candidates = [];
+        for (const [key, l] of Object.entries(loaders)) {
+            if (key === DEFAULT_KEY)
+                continue;
+            const currentLoader = typeof l === "string" ? loaders[l] : l;
+            if (typeof currentLoader === "string")
+                continue; // Should not happen if config is correct
+            candidates.push(currentLoader);
+        }
+        // Sort by postfix length descending to match longest extension first
+        candidates.sort((a, b) => b.postfix.length - a.postfix.length);
+        for (const currentLoader of candidates) {
+            if (path.endsWith(currentLoader.postfix)) {
+                resolvedLoader = currentLoader;
+                break;
+            }
+        }
+        if (resolvedLoader) {
+            loader = resolvedLoader;
+        }
+        else {
+            loader = loaders[DEFAULT_KEY];
+            if (typeof loader === "string") {
+                loader = loaders[loader];
+            }
+        }
+    }
+    else {
+        loader = loaders[loaderKey];
+    }
+    if (typeof loader === "string") {
+        throw new Error("Loader redirection is not supported here");
+    }
+    return loader;
+}
+function resolveExtends(componentConstructor) {
+    for (const [cls, tag] of EXTENDS_MAP) {
+        if (componentConstructor.prototype instanceof cls) {
+            return tag;
+        }
+    }
+    return null;
+}
 async function lazyLoad(root, prefixMap, loaders) {
     let elements = root.querySelectorAll(':not(:defined)');
     let undefinedTagInfos = getUndefinedTagInfos(Array.from(elements));
     while (undefinedTagInfos.length > 0) {
         for (const tagInfo of undefinedTagInfos) {
-            let info = matchNameSpace(tagInfo.name, prefixMap);
+            const info = matchNameSpace(tagInfo.name, prefixMap);
             if (info === null) {
                 throw new Error("No matching namespace found for lazy loaded component: " + tagInfo.name);
             }
             let loader;
-            if (info.loaderKey === null || info.loaderKey === DEFAULT_KEY || info.loaderKey === "") {
-                loader = loaders[DEFAULT_KEY];
-                if (typeof loader === "string") {
-                    loader = loaders[loader];
-                }
+            try {
+                loader = resolveLoader("", info.loaderKey, loaders);
             }
-            else {
-                loader = loaders[info.loaderKey];
-            }
-            if (typeof loader === "string") {
+            catch (_e) {
                 throw new Error("Loader redirection is not supported for lazy loaded components: " + tagInfo.name);
             }
             loadingTags.add(tagInfo.name);
-            let file = tagInfo.name.slice(info.prefix.length + 1);
+            const file = tagInfo.name.slice(info.prefix.length + 1);
             if (file === "") {
                 throw new Error("Invalid component name for lazy loaded component: " + tagInfo.name);
             }
@@ -196,26 +303,24 @@ async function lazyLoad(root, prefixMap, loaders) {
 async function eagerLoad(loadMap, loaders) {
     for (const [tagName, info] of Object.entries(loadMap)) {
         let loader;
-        if (info.loaderKey === null || info.loaderKey === DEFAULT_KEY || info.loaderKey === "") {
-            loader = loaders[DEFAULT_KEY];
-            if (typeof loader === "string") {
-                loader = loaders[loader];
-            }
+        try {
+            loader = resolveLoader(info.key, info.loaderKey, loaders);
         }
-        else {
-            loader = loaders[info.loaderKey];
-        }
-        if (typeof loader === "string") {
+        catch (_e) {
             throw new Error("Loader redirection is not supported for eager loaded components: " + tagName);
         }
         try {
             const componentConstructor = await loader.loader(info.key);
             if (componentConstructor !== null) {
-                if (info.extends === null) {
+                let extendsName = info.extends;
+                if (extendsName === null) {
+                    extendsName = resolveExtends(componentConstructor);
+                }
+                if (extendsName === null) {
                     customElements.define(tagName, componentConstructor);
                 }
                 else {
-                    customElements.define(tagName, componentConstructor, { extends: info.extends });
+                    customElements.define(tagName, componentConstructor, { extends: extendsName });
                 }
             }
         }
