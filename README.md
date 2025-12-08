@@ -98,16 +98,24 @@ To load a specific component immediately, use a key that does NOT end with `/`.
 
 Format: `"@components/<tagName>[|<loader>[,<extends>]]": "<path>"`
 
+- **Loader** (Optional): If omitted, it is automatically resolved based on the file extension (e.g., `.js` -> default loader, `.lit.js` -> lit-loader).
+- **Extends** (Optional): If omitted, it is automatically detected if the component class extends a built-in HTML element (e.g., `HTMLButtonElement` -> `extends: 'button'`).
+
 **Examples:**
 
 ```json
 {
   "imports": {
     // Eager loads <my-button> from ./my-button.js
+    // Loader: Auto-detected (.js)
+    // Extends: Auto-detected (e.g. if class extends HTMLButtonElement)
     "@components/my-button": "./my-button.js",
 
-    // Eager loads <fancy-input> extending 'input'
-    "@components/fancy-input|vanilla,input": "./fancy-input.js"
+    // Explicitly specifying loader and extends
+    "@components/fancy-input|vanilla,input": "./fancy-input.js",
+    
+    // Auto-detect loader for Lit element (if lit-loader is configured)
+    "@components/my-lit-button": "./my-button.lit.js"
   }
 }
 ```

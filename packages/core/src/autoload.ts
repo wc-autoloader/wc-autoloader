@@ -138,11 +138,19 @@ function resolveLoader(
   if (loaderKey === null || loaderKey === DEFAULT_KEY || loaderKey === "") {
     // Try to resolve by postfix
     let resolvedLoader: ILoader | null = null;
+    
+    const candidates: ILoader[] = [];
     for (const [key, l] of Object.entries(loaders)) {
       if (key === DEFAULT_KEY) continue;
       const currentLoader = typeof l === "string" ? loaders[l] : l;
       if (typeof currentLoader === "string") continue; // Should not happen if config is correct
-      
+      candidates.push(currentLoader);
+    }
+
+    // Sort by postfix length descending to match longest extension first
+    candidates.sort((a, b) => b.postfix.length - a.postfix.length);
+
+    for (const currentLoader of candidates) {
       if (path.endsWith(currentLoader.postfix)) {
         resolvedLoader = currentLoader;
         break;
