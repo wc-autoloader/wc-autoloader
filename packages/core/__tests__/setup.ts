@@ -1,6 +1,5 @@
-import { beforeEach } from 'vitest';
+// Setup file for Vitest
+import { vi } from 'vitest';
 
-beforeEach(() => {
-  // Reset the DOM
-  document.body.innerHTML = '';
-});
+// Mock global objects if needed
+// For example, if we need to mock fetch or other browser APIs not present in jsdom/happy-dom

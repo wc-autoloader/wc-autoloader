@@ -1,6 +1,7 @@
 import { buildMap, loadImportmap } from "./importmap.js";
 import { config } from "./config.js";
-import { eagerLoad, lazyLoad } from "./autoload.js";
+import { eagerLoad } from "./eagerload.js";
+import { handlerForLazyLoad } from "./lazyLoad.js";
 
 export async function registerHandler(): Promise<void> {
   const importmap = loadImportmap(); // 事前に importmap を読み込んでおく
@@ -9,28 +10,8 @@ export async function registerHandler(): Promise<void> {
   }
   const { prefixMap, loadMap } = buildMap(importmap);
   // 先にeager loadを実行すると、DOMContentLoadedイベントが発生しないことがあるため、後に実行する
-
   document.addEventListener("DOMContentLoaded", async (): Promise<void> => {
-    if (Object.keys(prefixMap).length === 0) {
-      return;
-    }
-    try {
-      await lazyLoad(document, prefixMap, config.loaders);
-    } catch(e) {
-      throw new Error("Failed to lazy load components: " + e);
-    }
-
-    if (!config.observable) {
-      return;
-    }
-    const mo = new MutationObserver(async (): Promise<void> => {
-      try {
-        await lazyLoad(document, prefixMap, config.loaders);
-      } catch(e) {
-        throw new Error("Failed to lazy load components: " + e);
-      }
-    });
-    mo.observe(document.documentElement, { childList: true, subtree: true });
+    await handlerForLazyLoad(document, config, prefixMap);
   });
 
   try {

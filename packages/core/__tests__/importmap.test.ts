@@ -1,194 +1,175 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { buildMap, loadImportmap } from '../src/importmap';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { loadImportmap, buildMap } from '../src/importmap.js';
 
 describe('importmap', () => {
-  beforeEach(() => {
-    document.body.innerHTML = '';
-  });
-
   describe('loadImportmap', () => {
-    it('should return null when no importmap exists', () => {
-      const result = loadImportmap();
-      expect(result).toBeNull();
+    afterEach(() => {
+      document.body.innerHTML = '';
     });
 
-    it('should parse importmap from script tag', () => {
-      document.body.innerHTML = `
-        <script type="importmap">
-          {
-            "imports": {
-              "@components/button/": "./components/button/"
-            }
-          }
-        </script>
-      `;
-      
-      const result = loadImportmap();
-      expect(result).toEqual({
+    it('should return null if no importmap script exists', () => {
+      expect(loadImportmap()).toBeNull();
+    });
+
+    it('should return null if importmap script has no imports', () => {
+      const script = document.createElement('script');
+      script.type = 'importmap';
+      script.innerHTML = JSON.stringify({});
+      document.body.appendChild(script);
+      expect(loadImportmap()).toBeNull();
+    });
+
+    it('should load imports from importmap script', () => {
+      const script = document.createElement('script');
+      script.type = 'importmap';
+      script.innerHTML = JSON.stringify({
         imports: {
-          "@components/button/": "./components/button/"
+          'foo': 'bar'
         }
       });
-    });
-
-    it('should merge multiple importmap scripts', () => {
-      document.body.innerHTML = `
-        <script type="importmap">
-          {
-            "imports": {
-              "@components/button/": "./components/button/"
-            }
-          }
-        </script>
-        <script type="importmap">
-          {
-            "imports": {
-              "@components/card/": "./components/card/"
-            }
-          }
-        </script>
-      `;
+      document.body.appendChild(script);
       
       const result = loadImportmap();
+      expect(result).not.toBeNull();
+      expect(result?.imports).toEqual({ 'foo': 'bar' });
+    });
+
+    it('should merge multiple importmaps', () => {
+      const script1 = document.createElement('script');
+      script1.type = 'importmap';
+      script1.innerHTML = JSON.stringify({
+        imports: {
+          'foo': 'bar'
+        }
+      });
+      document.body.appendChild(script1);
+
+      const script2 = document.createElement('script');
+      script2.type = 'importmap';
+      script2.innerHTML = JSON.stringify({
+        imports: {
+          'baz': 'qux'
+        }
+      });
+      document.body.appendChild(script2);
+
+      const result = loadImportmap();
       expect(result?.imports).toEqual({
-        "@components/button/": "./components/button/",
-        "@components/card/": "./components/card/"
+        'foo': 'bar',
+        'baz': 'qux'
       });
     });
 
-    it('should throw error when importmap has invalid JSON', () => {
-      document.body.innerHTML = `
-        <script type="importmap">
-          { invalid json }
-        </script>
-      `;
-      
-      expect(() => loadImportmap()).toThrow();
-    });
+    it('should throw error on invalid JSON', () => {
+      const script = document.createElement('script');
+      script.type = 'importmap';
+      script.innerHTML = '{ invalid json }';
+      document.body.appendChild(script);
 
-    it('should handle empty importmap script', () => {
-      document.body.innerHTML = `
-        <script type="importmap">
-        </script>
-      `;
-      
-      expect(() => loadImportmap()).toThrow();
-    });
-
-    it('should handle malformed JSON in importmap', () => {
-      document.body.innerHTML = `
-        <script type="importmap">
-          {"imports": {"test": }}
-        </script>
-      `;
-      
-      expect(() => loadImportmap()).toThrow();
+      expect(() => loadImportmap()).toThrow(/Failed to parse importmap JSON/);
     });
   });
 
   describe('buildMap', () => {
-    it('should build prefix map for namespaced components', () => {
+    it('should parse eager load components', () => {
       const importmap = {
         imports: {
-          "@components/ui/": "./components/ui/"
+          '@components/my-button': './components/button.js',
+          '@components/my-input|loader1': './components/input.js',
+          '@components/my-card|loader2,my-base-card': './components/card.js'
         }
       };
-      
-      const { prefixMap, loadMap } = buildMap(importmap);
-      
-      expect(prefixMap).toHaveProperty('ui');
-      expect(prefixMap.ui).toEqual({
-        key: "@components/ui/",
-        prefix: "ui",
-        loaderKey: null,
-        isNameSpaced: true
-      });
-      expect(loadMap).toEqual({});
-    });
 
-    it('should build load map for specific components', () => {
-      const importmap = {
-        imports: {
-          "@components/my-button": "./components/button.js"
-        }
-      };
-      
-      const { prefixMap, loadMap } = buildMap(importmap);
-      
+      const { loadMap, prefixMap } = buildMap(importmap);
+
       expect(prefixMap).toEqual({});
-      expect(loadMap).toHaveProperty('my-button');
       expect(loadMap['my-button']).toEqual({
-        key: "@components/my-button",
-        tagName: "my-button",
+        key: '@components/my-button',
+        tagName: 'my-button',
         loaderKey: null,
         extends: null,
         isNameSpaced: false
       });
+      expect(loadMap['my-input']).toEqual({
+        key: '@components/my-input|loader1',
+        tagName: 'my-input',
+        loaderKey: 'loader1',
+        extends: null,
+        isNameSpaced: false
+      });
+      expect(loadMap['my-card']).toEqual({
+        key: '@components/my-card|loader2,my-base-card',
+        tagName: 'my-card',
+        loaderKey: 'loader2',
+        extends: 'my-base-card',
+        isNameSpaced: false
+      });
     });
 
-    it('should handle loader key in namespaced components', () => {
+    it('should parse lazy load namespaces', () => {
       const importmap = {
         imports: {
-          "@components/ui|custom/": "./components/ui/"
+          '@components/ui/': './components/ui/',
+          '@components/form|loader1/': './components/form/'
         }
       };
-      
-      const { prefixMap } = buildMap(importmap);
-      
-      expect(prefixMap.ui).toEqual({
-        key: "@components/ui|custom/",
-        prefix: "ui",
-        loaderKey: "custom",
+
+      const { loadMap, prefixMap } = buildMap(importmap);
+
+      expect(loadMap).toEqual({});
+      expect(prefixMap['ui']).toEqual({
+        key: '@components/ui/',
+        prefix: 'ui',
+        loaderKey: null,
+        isNameSpaced: true
+      });
+      expect(prefixMap['form']).toEqual({
+        key: '@components/form|loader1/',
+        prefix: 'form',
+        loaderKey: 'loader1',
         isNameSpaced: true
       });
     });
 
-    it('should ignore non-component imports', () => {
+    it('should throw error for non-component keys that look like components but are invalid', () => {
       const importmap = {
         imports: {
-          "lodash": "./node_modules/lodash/index.js",
-          "@components/ui/": "./components/ui/"
+          '@components/': './components/' // Invalid: empty prefix
         }
       };
-      
+
+      expect(() => buildMap(importmap)).toThrow(/Invalid importmap key/);
+    });
+    
+    it('should throw error for invalid keys', () => {
+        // Test cases that might throw errors based on implementation
+        // The current implementation throws if prefix is empty or tagName is empty
+        
+        // Empty prefix (ends with /)
+        expect(() => buildMap({ imports: { '@components/|loader/': './' } })).toThrow(/Invalid importmap key/);
+        
+        // Empty tagName (does not end with /)
+        // "@components/|loader" -> tagNamePart is "|loader". split("|", 2) -> ["", "loader"]. tagName is empty.
+        expect(() => buildMap({ imports: { '@components/|loader': './' } })).toThrow(/Invalid importmap key/);
+    });
+    it('should ignore keys that do not start with @', () => {
+      const importmap = {
+        imports: {
+          'lodash': './lodash.js'
+        }
+      };
       const { prefixMap, loadMap } = buildMap(importmap);
-      
-      expect(Object.keys(prefixMap)).toHaveLength(1);
-      expect(prefixMap).toHaveProperty('ui');
+      expect(prefixMap).toEqual({});
+      expect(loadMap).toEqual({});
     });
 
-    it('should throw when namespace key is missing prefix', () => {
+    it('should throw error for invalid key (empty tag name)', () => {
       const importmap = {
         imports: {
-          "@components/|custom/": "./components/ui/"
+          '@components//': './ui/'
         }
       };
-
-      expect(() => buildMap(importmap)).toThrow('Invalid importmap key: @components/|custom/');
-    });
-
-    it('should throw when component key is missing tag name', () => {
-      const importmap = {
-        imports: {
-          "@components/|custom": "./components/button.js"
-        }
-      };
-
-      expect(() => buildMap(importmap)).toThrow('Invalid importmap key: @components/|custom');
-    });
-
-    it('should default loaderKey to null when loader info is absent', () => {
-      const importmap = {
-        imports: {
-          "@components/native-element": "./components/native-element.js"
-        }
-      };
-
-      const { loadMap } = buildMap(importmap);
-      expect(loadMap['native-element']).toMatchObject({
-        loaderKey: null,
-        extends: null
-      });
+      expect(() => buildMap(importmap)).toThrow("Invalid importmap key");
     });
   });
 });

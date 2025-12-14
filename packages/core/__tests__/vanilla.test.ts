@@ -1,31 +1,33 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { load } from '../src/vanilla.js';
+import { resolve } from 'path';
 
 describe('vanilla loader', () => {
-  it('should load module and return default export', async () => {
-    const mockConstructor = class extends HTMLElement {};
-    const mockModule = { default: mockConstructor };
+  it('should import module and return default export', async () => {
+    // Use a real file relative to this test file
+    // But load() takes a path. If it's used in browser, it's URL.
+    // In Node/Vitest, import() works with file paths.
     
-    // Dynamic import mocking is tricky in Vitest/Jest.
-    // Instead of mocking the import keyword (which is hard), 
-    // we can verify that the function attempts to import.
-    // However, since we cannot easily mock `import()`, we might rely on integration style test
-    // or just trust that it calls import.
+    // We need absolute path or relative to CWD?
+    // import() in Node resolves relative to current file if using relative path?
+    // But load() is in src/vanilla.ts.
+    // So relative path passed to load() will be resolved relative to src/vanilla.ts?
+    // No, import(path) resolves relative to the file containing the import statement.
+    // So src/vanilla.ts.
     
-    // Alternatively, we can try to use a real file if possible, or use vi.mock.
-    // But vi.mock works on module level, not for dynamic imports inside function easily unless using specific plugins.
+    // So we need path relative to src/vanilla.ts.
+    // src/vanilla.ts is in packages/core/src.
+    // fixture is in packages/core/__tests__/fixtures/dummy.js.
+    // Relative path: ../__tests__/fixtures/dummy.js.
     
-    // Let's try to mock the dynamic import by intercepting it if possible, 
-    // or just create a dummy file to import.
+    const path = '../__tests__/fixtures/dummy.js';
+    const Constructor = await load(path);
     
-    // Since we are in a node environment (vitest), we can try to import a real file.
-    // We can create a temporary file or use an existing one.
+    expect(Constructor).toBeDefined();
     
-    try {
-      const result = await load('../src/config.js'); // Use an existing file
-      expect(result).toBeDefined();
-    } catch (e) {
-      // It might fail because of path resolution or type mismatch, but it executes the code.
-    }
+    // To instantiate, we must define it
+    customElements.define('dummy-element', Constructor);
+    const el = new Constructor();
+    expect(el).toBeInstanceOf(HTMLElement);
   });
 });

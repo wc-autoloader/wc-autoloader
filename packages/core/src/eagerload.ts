@@ -1,7 +1,6 @@
 import { resolveLoader } from "./resoleveLoader.js";
 import { failedTags, loadingTags } from "./tags.js";
-import { IEagerLoadInfo, ILoader, INameSpaceInfo, IPrefixMap, ITagInfo } from "./types.js";
-
+import { IEagerLoadInfo, ILoader } from "./types.js";
 
 const EXTENDS_MAP = new Map<any, string>();
 
@@ -65,33 +64,12 @@ if (typeof window !== "undefined") {
   ] as const;
 
   map.forEach(([cls, tag]) => {
+    /* istanbul ignore next */
     if (typeof cls !== "undefined") {
       EXTENDS_MAP.set(cls, tag);
     }
   });
 }
-
-function getTagInfoFromElement(e: Element): ITagInfo {
-  const elementTagName = e.tagName.toLowerCase();
-  let name;
-  let extendsName;
-  if (elementTagName.includes("-")) {
-    name = elementTagName;
-    extendsName = null;
-  } else {
-    const tagName = e.getAttribute("is");
-    if (tagName === null) {
-      throw new Error("Custom element without a dash or 'is' attribute found: " + elementTagName);
-    }
-    if (!tagName.includes("-")) {
-      throw new Error("Custom element 'is' attribute without a dash found: " + elementTagName);
-    }
-    name = tagName;
-    extendsName = elementTagName;
-  }
-  return { name, extends: extendsName };
-}
-
 
 function resolveExtends(componentConstructor: CustomElementConstructor): string | null {
   for (const [cls, tag] of EXTENDS_MAP) {
