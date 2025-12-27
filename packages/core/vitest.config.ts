@@ -17,7 +17,14 @@ export default defineConfig({
         'src/exports.ts',
         'src/webc.ts',
         'src/types.ts'
-      ]
+      ],
+      ignoreEmptyLines: true,
+      thresholds: {
+        statements: 100,
+        branches: 97,
+        functions: 100,
+        lines: 100
+      }
     }
   }
 });

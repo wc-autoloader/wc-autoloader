@@ -1,5 +1,5 @@
 import { resolveLoader } from "./resoleveLoader.js";
-import { failedTags, loadingTags } from "./tags.js";
+import { failedTags } from "./tags.js";
 import { IEagerLoadInfo, ILoader } from "./types.js";
 
 const EXTENDS_MAP = new Map<any, string>();
@@ -80,10 +80,35 @@ function resolveExtends(componentConstructor: CustomElementConstructor): string 
   return null;
 }
 
+async function eagerLoadItem(info: IEagerLoadInfo, tagName:string, loader: ILoader): Promise<void> {
+  try {
+    const componentConstructor = await loader.loader(info.key);
+    if (componentConstructor !== null) {
+      let extendsName = info.extends;
+      if (extendsName === null) {
+        extendsName = resolveExtends(componentConstructor);
+      }
+
+      if (extendsName === null) {
+        customElements.define(tagName, componentConstructor);
+      } else {
+        customElements.define(tagName, componentConstructor, { extends: extendsName });
+      }
+    }
+  } catch(e) {
+    if (!failedTags.has(tagName)) {
+      console.error(`Failed to eager load component '${tagName}':`, e);
+      failedTags.add(tagName);
+    }
+  }
+
+}
+
 export async function eagerLoad(
   loadMap: Record<string, IEagerLoadInfo>, 
   loaders: Record<string, ILoader | string>
 ): Promise<void> {
+  const promises: Promise<void>[] = [];
   for(const [tagName, info] of Object.entries(loadMap)) {
     let loader: ILoader;
     try {
@@ -91,26 +116,7 @@ export async function eagerLoad(
     } catch (_e) {
       throw new Error("Loader redirection is not supported for eager loaded components: " + tagName);
     }
-
-    try {
-      const componentConstructor = await loader.loader(info.key);
-      if (componentConstructor !== null) {
-        let extendsName = info.extends;
-        if (extendsName === null) {
-          extendsName = resolveExtends(componentConstructor);
-        }
-
-        if (extendsName === null) {
-          customElements.define(tagName, componentConstructor);
-        } else {
-          customElements.define(tagName, componentConstructor, { extends: extendsName });
-        }
-      }
-    } catch(e) {
-      if (!failedTags.has(tagName)) {
-        console.error(`Failed to eager load component '${tagName}':`, e);
-        failedTags.add(tagName);
-      }
-    }
+    promises.push(eagerLoadItem(info, tagName, loader));
   }
+  await Promise.all(promises);
 }

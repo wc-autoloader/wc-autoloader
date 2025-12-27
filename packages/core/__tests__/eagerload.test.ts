@@ -105,6 +105,77 @@ describe('eagerLoad', () => {
     expect(customElements.define).not.toHaveBeenCalled();
   });
 
+  it('should load multiple components in parallel', async () => {
+    const mockConstructor1 = class extends HTMLElement {};
+    const mockConstructor2 = class extends HTMLElement {};
+    
+    const mockLoader: ILoader = {
+      postfix: '.js',
+      loader: vi.fn().mockImplementation(async (path) => {
+        if (path === '@components/comp1') return mockConstructor1;
+        if (path === '@components/comp2') return mockConstructor2;
+        return null;
+      })
+    };
+    const loaders = { [DEFAULT_KEY]: mockLoader };
+    const loadMap = {
+      'comp-1': {
+        key: '@components/comp1',
+        tagName: 'comp-1',
+        loaderKey: null,
+        extends: null,
+        isNameSpaced: false
+      },
+      'comp-2': {
+        key: '@components/comp2',
+        tagName: 'comp-2',
+        loaderKey: null,
+        extends: null,
+        isNameSpaced: false
+      }
+    };
+
+    await eagerLoad(loadMap, loaders);
+
+    expect(customElements.define).toHaveBeenCalledWith('comp-1', mockConstructor1);
+    expect(customElements.define).toHaveBeenCalledWith('comp-2', mockConstructor2);
+  });
+
+  it('should continue loading other components if one fails', async () => {
+    const mockConstructor = class extends HTMLElement {};
+    
+    const mockLoader: ILoader = {
+      postfix: '.js',
+      loader: vi.fn().mockImplementation(async (path) => {
+        if (path === '@components/success') return mockConstructor;
+        if (path === '@components/fail') throw new Error('Failed');
+        return null;
+      })
+    };
+    const loaders = { [DEFAULT_KEY]: mockLoader };
+    const loadMap = {
+      'comp-success': {
+        key: '@components/success',
+        tagName: 'comp-success',
+        loaderKey: null,
+        extends: null,
+        isNameSpaced: false
+      },
+      'comp-fail': {
+        key: '@components/fail',
+        tagName: 'comp-fail',
+        loaderKey: null,
+        extends: null,
+        isNameSpaced: false
+      }
+    };
+
+    await eagerLoad(loadMap, loaders);
+
+    expect(customElements.define).toHaveBeenCalledWith('comp-success', mockConstructor);
+    expect(console.error).toHaveBeenCalled();
+  });
+
   it('should not retry failed tags', async () => {
     const mockLoader: ILoader = {
       postfix: '.js',
@@ -172,5 +243,27 @@ describe('eagerLoad', () => {
     } finally {
       vi.stubGlobal('HTMLButtonElement', originalButton);
     }
+  });
+
+  it('should handle loader returning null', async () => {
+    const mockLoader: ILoader = {
+      postfix: '.js',
+      loader: vi.fn().mockResolvedValue(null)
+    };
+    const loaders = { [DEFAULT_KEY]: mockLoader };
+    const loadMap = {
+      'my-element': {
+        key: '@components/my-element',
+        tagName: 'my-element',
+        loaderKey: null,
+        extends: null,
+        isNameSpaced: false
+      }
+    };
+
+    await eagerLoad(loadMap, loaders);
+
+    expect(mockLoader.loader).toHaveBeenCalledWith('@components/my-element');
+    expect(customElements.define).not.toHaveBeenCalled();
   });
 });

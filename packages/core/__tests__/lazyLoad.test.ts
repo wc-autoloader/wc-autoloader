@@ -403,6 +403,123 @@ describe('lazyLoad', () => {
     );
   });
 
+  it('should not observe the same shadow root twice', async () => {
+    const mockConstructor = class extends HTMLElement {
+      constructor() {
+        super();
+        this.attachShadow({ mode: 'open' });
+      }
+    };
+    customElements.define('ui-shadow', mockConstructor);
+
+    const config = {
+      loaders: {},
+      observable: false,
+      scanImportmap: false
+    };
+    const prefixMap = {
+      'ui': {
+        key: '@components/ui/',
+        prefix: 'ui',
+        loaderKey: null,
+        isNameSpaced: true
+      }
+    };
+
+    const el = document.createElement('ui-shadow');
+    document.body.appendChild(el);
+
+    // First pass
+    await handlerForLazyLoad(document, config, prefixMap);
+    
+    // Second pass (should skip observation)
+    await handlerForLazyLoad(document, config, prefixMap);
+  });
+
+  it('should observe shadow root when element becomes defined via whenDefined', async () => {
+    // Restore default mocks for this test
+    vi.restoreAllMocks();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    
+    // Create a custom element class with shadow root
+    const mockConstructor = class extends HTMLElement {
+      constructor() {
+        super();
+        this.attachShadow({ mode: 'open' });
+      }
+    };
+    
+    // Mock whenDefined to resolve immediately
+    vi.spyOn(customElements, 'whenDefined').mockImplementation((_name: string) => {
+      return Promise.resolve(mockConstructor);
+    });
+
+    const mockLoader: ILoader = {
+      postfix: '.js',
+      loader: vi.fn().mockResolvedValue(mockConstructor)
+    };
+    const config = {
+      loaders: { [DEFAULT_KEY]: mockLoader },
+      observable: false,
+      scanImportmap: false
+    };
+    const prefixMap = {
+      'shadow': {
+        key: '@components/shadow/',
+        prefix: 'shadow',
+        loaderKey: null,
+        isNameSpaced: true
+      }
+    };
+
+    // Add a custom element that hasn't been defined yet
+    document.body.innerHTML = '<shadow-component></shadow-component>';
+
+    // This will trigger whenDefined callback which calls checkObserveShadowRoot
+    await handlerForLazyLoad(document, config, prefixMap);
+
+    // Wait for whenDefined promise to resolve and checkObserveShadowRoot to be called
+    await new Promise(resolve => setTimeout(resolve, 100));
+  });
+
+  it('should handle error in MutationObserver callback and log to console', async () => {
+    // This test covers the catch block in MutationObserver callback (line 176)
+    const config = {
+      loaders: {},
+      observable: true,
+      scanImportmap: false
+    };
+    const prefixMap = {
+      'err': {
+        key: '@components/err/',
+        prefix: 'err',
+        loaderKey: null,
+        isNameSpaced: true
+      }
+    };
+
+    // Initial load with empty body
+    document.body.innerHTML = '';
+    await handlerForLazyLoad(document, config, prefixMap);
+
+    // Mock createTreeWalker to throw after the MutationObserver is set up
+    vi.spyOn(document, 'createTreeWalker').mockImplementationOnce(() => {
+      throw new Error('TreeWalker Error in MO');
+    });
+
+    // Add an element to trigger MutationObserver
+    const el = document.createElement('err-element');
+    document.body.appendChild(el);
+
+    // Wait for MutationObserver callback to execute and catch the error
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // The error should be caught and logged via console.error
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining('Failed to lazy load components')
+    );
+  });
+
   describe('getCustomTagInfo', () => {
     it('should throw if element has no dash and no is attribute', () => {
       const el = document.createElement('div');

@@ -209,7 +209,31 @@ function resolveExtends(componentConstructor) {
     }
     return null;
 }
+async function eagerLoadItem(info, tagName, loader) {
+    try {
+        const componentConstructor = await loader.loader(info.key);
+        if (componentConstructor !== null) {
+            let extendsName = info.extends;
+            if (extendsName === null) {
+                extendsName = resolveExtends(componentConstructor);
+            }
+            if (extendsName === null) {
+                customElements.define(tagName, componentConstructor);
+            }
+            else {
+                customElements.define(tagName, componentConstructor, { extends: extendsName });
+            }
+        }
+    }
+    catch (e) {
+        if (!failedTags.has(tagName)) {
+            console.error(`Failed to eager load component '${tagName}':`, e);
+            failedTags.add(tagName);
+        }
+    }
+}
 async function eagerLoad(loadMap, loaders) {
+    const promises = [];
     for (const [tagName, info] of Object.entries(loadMap)) {
         let loader;
         try {
@@ -218,28 +242,9 @@ async function eagerLoad(loadMap, loaders) {
         catch (_e) {
             throw new Error("Loader redirection is not supported for eager loaded components: " + tagName);
         }
-        try {
-            const componentConstructor = await loader.loader(info.key);
-            if (componentConstructor !== null) {
-                let extendsName = info.extends;
-                if (extendsName === null) {
-                    extendsName = resolveExtends(componentConstructor);
-                }
-                if (extendsName === null) {
-                    customElements.define(tagName, componentConstructor);
-                }
-                else {
-                    customElements.define(tagName, componentConstructor, { extends: extendsName });
-                }
-            }
-        }
-        catch (e) {
-            if (!failedTags.has(tagName)) {
-                console.error(`Failed to eager load component '${tagName}':`, e);
-                failedTags.add(tagName);
-            }
-        }
+        promises.push(eagerLoadItem(info, tagName, loader));
     }
+    await Promise.all(promises);
 }
 
 const isCustomElement = (node) => {
